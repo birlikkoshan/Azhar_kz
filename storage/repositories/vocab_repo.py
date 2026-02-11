@@ -10,9 +10,10 @@ def _utc_now_iso() -> str:
 
 
 def add_words(telegram_id: int, words: Iterable[Dict[str, Any]]) -> None:
-    """Add multiple words for a user.
+    """Add or update words for this user only. Never touches other users' data.
 
     Each item in words is expected to have keys: word, translation, example.
+    Same (telegram_id, word) is updated, not duplicated.
     """
     now = _utc_now_iso()
     rows = []
@@ -37,6 +38,10 @@ def add_words(telegram_id: int, words: Iterable[Dict[str, Any]]) -> None:
             """
             INSERT INTO vocab (telegram_id, word, translation, example, added_at)
             VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(telegram_id, word) DO UPDATE SET
+                translation = excluded.translation,
+                example = excluded.example,
+                added_at = excluded.added_at
             """,
             rows,
         )

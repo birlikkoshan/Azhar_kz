@@ -34,15 +34,44 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS vocab (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                telegram_id INTEGER,
-                word TEXT,
+                telegram_id INTEGER NOT NULL,
+                word TEXT NOT NULL,
                 translation TEXT,
                 example TEXT,
-                added_at TEXT
+                added_at TEXT,
+                UNIQUE(telegram_id, word)
             )
             """
         )
-
+        # Ensure unique index exists (for DBs created before this constraint was added)
+        try:
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_vocab_user_word ON vocab(telegram_id, word)"
+            )
+        except sqlite3.OperationalError:
+            # Old DB may have duplicate (telegram_id, word); dedupe then add index
+            cur.execute(
+                """
+                CREATE TABLE vocab_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    telegram_id INTEGER NOT NULL,
+                    word TEXT NOT NULL,
+                    translation TEXT,
+                    example TEXT,
+                    added_at TEXT,
+                    UNIQUE(telegram_id, word)
+                )
+                """
+            )
+            cur.execute(
+                """
+                INSERT OR IGNORE INTO vocab_new (id, telegram_id, word, translation, example, added_at)
+                SELECT id, telegram_id, word, translation, example, added_at FROM vocab
+                ORDER BY id DESC
+                """
+            )
+            cur.execute("DROP TABLE vocab")
+            cur.execute("ALTER TABLE vocab_new RENAME TO vocab")
         conn.commit()
     finally:
         conn.close()
