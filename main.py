@@ -194,11 +194,6 @@ async def level_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await _send_main_menu(update, f"Деңгей сақталды: {level}")
 
 
-async def menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle 'Меню' button: just show main menu."""
-    await _send_main_menu(update, "Негізгі мәзір.")
-
-
 async def today_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle 'Бүгінгі сабақ' button: show lesson for current level.
 
@@ -789,7 +784,6 @@ def main() -> None:
     application.add_handler(CommandHandler("vocab", vocab_menu))
     application.add_handler(CommandHandler("trend", trend_menu))
     application.add_handler(MessageHandler(filters.Regex("^Баптау$"), settings_menu))
-    application.add_handler(MessageHandler(filters.Regex("^Меню$"), menu_button))
     application.add_handler(MessageHandler(filters.Regex("^Сөздік$"), vocab_menu))
     application.add_handler(MessageHandler(filters.Regex("^Тренд сөздер$"), trend_menu))
     application.add_handler(
