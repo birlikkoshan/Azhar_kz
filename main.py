@@ -26,7 +26,6 @@ from telegram.ext import (  # type: ignore[import]
 
 from content.loader import (
     get_lesson_for_user,
-    get_quiz_questions_from_sentances,
     get_trend_phrases,
     load_lessons,
 )
@@ -391,37 +390,29 @@ def _build_quiz_questions_from_vocab(vocab_items: List[Dict[str, Any]], count: i
 
 
 def _get_quiz_questions_for_user(telegram_id: int, level: str) -> List[Dict[str, Any]]:
-    """Mini-test from user's vocab (сөздік) or from sentances.json. Prefer vocab if >= 5 words."""
-    vocab = vocab_repo.random_words(telegram_id, 20)
-    if len(vocab) >= 5:
-        return _build_quiz_questions_from_vocab(vocab, count=15)
-    try:
-        return get_quiz_questions_from_sentances(level, count=15)
-    except Exception:
-        logger.warning("Failed to load quiz from sentances", exc_info=True)
+    """Mini-test only from user's vocab (сөздік)."""
+    vocab = vocab_repo.random_words(telegram_id, 50)
+    # Need at least a few words to form questions with wrong options
+    if len(vocab) < 3:
         return []
+    return _build_quiz_questions_from_vocab(vocab, count=15)
 
 
 async def mini_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Start mini quiz from user's vocab (сөздік) or sentances. State kept in user_data."""
+    """Start mini quiz from user's personal vocab (сөздік). State kept in user_data."""
     tg_user = update.effective_user
     if not tg_user or not update.message:
         return
     user = user_repo.get_user(tg_user.id)
     level = (user or {}).get("level") or "A1"
-    try:
-        questions = _get_quiz_questions_for_user(tg_user.id, level)
-    except Exception:
-        logger.warning("Content load failed (quiz)", exc_info=True)
-        await _reply_content_error(update.message)
-        return
+    questions = _get_quiz_questions_for_user(tg_user.id, level)
     if not questions:
         await update.message.reply_text(
-            "Сөздікте немесе сөйлемдерде жеткілікті материал жоқ. Алдымен сөздерді сақтаңыз немесе сабақ өтіңіз.",
+            "Сіздің сөздігіңізде жеткілікті сөз жоқ. Алдымен бірнеше сөз сақтаңыз.",
             reply_markup=build_main_menu_keyboard(),
         )
         return
-    logger.info("Quiz started for user %s (from vocab/sentances)", tg_user.id)
+    logger.info("Quiz started for user %s (from vocab)", tg_user.id)
     state = _quiz_state(context)
     state["quiz_questions"] = questions
     state["quiz_index"] = 0
@@ -498,15 +489,10 @@ async def quiz_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if data == "quiz:retry":
         user = user_repo.get_user(tg_user.id)
         level = (user or {}).get("level") or "A1"
-        try:
-            questions = _get_quiz_questions_for_user(tg_user.id, level)
-        except Exception:
-            logger.warning("Content load failed (quiz retry)", exc_info=True)
-            await _reply_content_error(query.message)
-            return
+        questions = _get_quiz_questions_for_user(tg_user.id, level)
         if not questions:
             await query.message.edit_text(
-                "Сөздікте немесе сөйлемдерде жеткілікті материал жоқ. Алдымен сөздерді сақтаңыз немесе сабақ өтіңіз."
+                "Сіздің сөздігіңізде жеткілікті сөз жоқ. Алдымен бірнеше сөз сақтаңыз."
             )
             return
         state = _quiz_state(context)
